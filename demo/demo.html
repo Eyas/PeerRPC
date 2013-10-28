@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>PeerRPC Demo</title>
+    <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+    <script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+    <script src="../js/rpc.js"></script>
+</head>
+<body>
+    <p>Welcome to the demo, your id is <span id="my_guid"></span>.</p>
+    <form id="connect">
+        Connect with <input type="text" name="other_id" /><input type="submit" value="Go" />
+    </form>
+    <form id="perform_with">
+        <p>With connected peer <select id="connected_peers"></select>, show message <input type="text" name="message" /><input type="submit" value="Go" />.</p>
+    </form>
+    <script type="text/javascript">
+        $(function () {
+            // My RPC methods:
+            var show_message = function (str) {
+                alert(str);
+            };
+
+            var perform_calculation = function (a, b) {
+                return a * b;
+            };
+
+            var return_object = function () {
+                return { key1: "stringval", key2: 500, key3: [3, 4, 5, "six"] };
+            };
+
+            // My initialization code
+            var my_guid = guid();
+            var rpc = new RPC(my_guid, 'elszxxookm1v2t9');
+            window.rpc = rpc;
+
+            rpc.register("show_message", show_message);
+            rpc.register("perform_calculation", perform_calculation);
+            rpc.register("return_object", return_object);
+
+            rpc.onDiscover = function (other_id) {
+                $("<option>" + other_id + "</option>").attr("guid", other_id).appendTo($("#connected_peers"));
+            };
+            rpc.onDisconnect = function (other_id) {
+                $("option[guid=" + other_id + "]").remove();
+            }
+
+            $("#my_guid").text(my_guid);
+            $("#connect input[type=submit]").click(function (event) {
+                event.stopPropagation();
+                event.preventDefault();
+                rpc.connect($("input[name=other_id]").val());
+            });
+            $("#perform_with input[type=submit]").click(function (event) {
+                event.preventDefault();
+                rpc.with($("#perform_with select").val()).show_message($("#perform_with input[name=message]").val());
+            });
+        });
+    </script>
+</body>
+</html>

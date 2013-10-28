@@ -7,6 +7,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "js", "js", "{AB9B7D36-9579-
 		js\rpc.js = js\rpc.js
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demo", "demo", "{B15861BE-4818-4A99-8EA4-92868F68C7B5}"
+	ProjectSection(SolutionItems) = preProject
+		demo\demo.html = demo\demo.html
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

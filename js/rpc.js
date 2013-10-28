@@ -9,7 +9,7 @@ var guid = function () {
     return s4() + s4() + s4() + s4() + s4() + s4() + s4() + s4();
 }
 
-var RPC = function (_guid) {
+var RPC = function (_guid, _key) {
 
     var RpcReturn = function (rpc, uid, callTime) {
 
@@ -53,11 +53,10 @@ var RPC = function (_guid) {
     this.peers = new Object();
     this.pending = new Object(); // pending calls which have not returned.
 
-    var my_guid;
-    if (_guid === undefined) { my_guid = guid(); }
-    else { my_guid = _guid; }
+    var my_guid = my_guid = _guid;
+    var my_key = _key;
 
-    this.me = new Peer(my_guid, { key: 'elszxxookm1v2t9' });
+    this.me = new Peer(my_guid, { key: my_key });
 
     this.me.on('error', function (e) {
         if (!e || (e.message && e.message.substr(0,17) === 'Could not connect')) return;
@@ -126,7 +125,7 @@ var RPC = function (_guid) {
         return ret;
     };
     this.connect = function (peerId) {
-        if (!this.status) return;
+        if (!this.status || peerId === undefined) return false;
         var conn = __rpc.me.connect(peerId);
         if (conn) {
             conn.on('open', function () {
@@ -134,6 +133,7 @@ var RPC = function (_guid) {
             });
         } else {
             delete __rpc.peers[peerId];
+            return false;
         }
         return true;
     };
@@ -152,7 +152,7 @@ var RPC = function (_guid) {
     };
     this.online = function () {
         this.status = true;
-        __rpc.me = new Peer(my_guid, { key: 'elszxxookm1v2t9' });
+        __rpc.me = new Peer(my_guid, { key: my_key });
         onNewRPC();
     };
 
