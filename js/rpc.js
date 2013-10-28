@@ -1,46 +1,48 @@
-function s4() {
-    return Math.floor((1 + Math.random()) * 0x10000)
-        .toString(16)
-        .substring(1);
-}
-function guid() {
+var guid = function () {
+
+    var s4 = function () {
+        return Math.floor((1 + Math.random()) * 0x10000)
+            .toString(16)
+            .substring(1);
+    }
+
     return s4() + s4() + s4() + s4() + s4() + s4() + s4() + s4();
 }
 
-function RpcReturn(rpc, uid, callTime) {
+var RPC = function (_guid) {
 
-    this.callTime = callTime;
-    this.rpc = rpc;
-    this.uid = uid;
+    var RpcReturn = function (rpc, uid, callTime) {
 
-    /// takes function(result){}
-    this.onSuccess = function (func) {
-        if (rpc.pending[uid] === undefined) {
-            if (new Date() - callTime <= 500) {
-                var _this = this;
-                window.setTimeout(function () { _this.onSuccess(func); }, 100);
-            }
-        } else {
-            func(rpc.pending[uid]);
-        }
-        return this;
-    };
+        this.callTime = callTime;
+        this.rpc = rpc;
+        this.uid = uid;
 
-    /// takes function(){}
-    this.onFailure = function (func) {
-        if (rpc.pending[uid] === undefined) {
-            if (new Date() - this.callTime > 500) {
-                func();
+        /// takes function(result){}
+        this.onSuccess = function (func) {
+            if (rpc.pending[uid] === undefined) {
+                if (new Date() - callTime <= 500) {
+                    var _this = this;
+                    window.setTimeout(function () { _this.onSuccess(func); }, 100);
+                }
             } else {
-                var _this = this;
-                window.setTimeout(function () { _this.onFailure(func); }, 100);
+                func(rpc.pending[uid]);
             }
-        }
-        return this;
-    };
-};
+            return this;
+        };
 
-function RPC(_guid) {
+        /// takes function(){}
+        this.onFailure = function (func) {
+            if (rpc.pending[uid] === undefined) {
+                if (new Date() - this.callTime > 500) {
+                    func();
+                } else {
+                    var _this = this;
+                    window.setTimeout(function () { _this.onFailure(func); }, 100);
+                }
+            }
+            return this;
+        };
+    };
 
     var __rpc = this;
     this.status = true;
@@ -58,7 +60,7 @@ function RPC(_guid) {
     this.me = new Peer(my_guid, { key: 'elszxxookm1v2t9' });
 
     this.me.on('error', function (e) {
-        if (!e || (e.message && e.message.substr(0,17) == 'Could not connect')) return;
+        if (!e || (e.message && e.message.substr(0,17) === 'Could not connect')) return;
         console.log({error: arguments});
     });
 
@@ -77,7 +79,7 @@ function RPC(_guid) {
             __rpc.pending[callUid] = undefined;
 
             if (__rpc.peers[peerId]) {
-                //console.log("About to call RPC send for " + name + " with args " + args + ".");
+
                 __rpc.peers[peerId].send({
                     "type": "rpc-call",
                     "call": name,
@@ -92,19 +94,18 @@ function RPC(_guid) {
         __rpc[name] = __rpc.call[name]; // rpc.funcA is a shorthand for rpc.call.funcA;
         __rpc._functions[name] = func;
         __rpc.receive[name] = function (from, uid, args) {
-            //console.log("About to apply function " + name + " with args " + args + ".");
+
             var __this = null;
             if (__this !== undefined) { __this = this; }
             var retval = __rpc._functions[name].apply(__this, args);
             var conn = __rpc.peers[from];
-            //console.log("About to reply to "+name+" from "+from);
+
             conn.send({
                 "type": "rpc-response",
                 "call": name,
                 "reply": retval,
                 "uid": uid
             });
-            //console.log("After send");
         };
 
         return __rpc[name]; // rpc.register() returns the function so we can save it in objects
@@ -160,10 +161,9 @@ function RPC(_guid) {
         __rpc.me.on('connection', function (conn) {
             if (__rpc.peers[conn.peer] === undefined) {
                 __rpc.peers[conn.peer] = __rpc.me.connect(conn.peer);
-                //console.log("blablab");
+
                 __rpc.peers[conn.peer].on('open', function () {
                     if (__rpc.onDiscover) {
-                        //console.log("I'm calling on Discover for peer" + conn.peer);
                         __rpc.onDiscover(conn.peer);
 
                     }
@@ -178,13 +178,11 @@ function RPC(_guid) {
             });
 
             conn.on('data', function (data) {
-                //console.log(data);
                 if (data.type === "rpc-call") {
                     var passedArgs = [];
                     for (key in data.args) { passedArgs.push(data.args[key]); }
                     __rpc.receive[data["call"]](data.from, data.uid, passedArgs);
                 } else if (data.type === "rpc-response") {
-                    //console.log("Je l response?:" + data.uid);
                     __rpc.pending[data.uid] = data.reply;
                 }
             });
