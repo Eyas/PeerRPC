@@ -10,29 +10,28 @@ Procedure calls
 
 For example, to register a function:
 ```javascript
-  rpc.register("functionName", function(args..) {
-    ...
-    return retval;
-  });
+rpc.register("functionName", function(args..) {
+  ...
+  return retval;
+});
 ```
 
 Now you can call this function by:
 ```javascript
-  rpc.functionName(toPeer, args...);
-  // or:
-  rpc.with(toPeer ).functionName(args...);
+rpc.functionName(toPeer, args...);
+// or:
+rpc.with(toPeer ).functionName(args...);
 ```
 
-Further, since it is difficult and typically undesirable for interactive JS applications to block on I/O functions until they return or fail, we provide a callback registration system too:
+Since it is difficult and typically undesirable for interactive JS applications to block on I/O functions until they return or fail, we interact with return values using "success" and "failure" callbacks:
 
 ```javascript
-	rpc.with(toPeer).functionName(args...)
-		.onSuccess(function(retVal) {
-      ...
-    })
-		.onFailure(function() {
-      ...
-    });
+rpc.with(toPeer).functionName(args...)
+  .onSuccess(function(retVal) {
+    ...
+  }).onFailure(function() {
+    ...
+  });
 ```
 
 Method calls
