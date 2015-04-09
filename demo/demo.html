@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>PeerRPC Demo</title>
-    <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+    <script src="http://code.jquery.com/jquery-2.1.3.min.js"></script>
     <script src="http://cdn.peerjs.com/0.3/peer.js"></script>
     <script src="../js/rpc.js"></script>
 </head>
@@ -14,9 +14,23 @@
     </form>
     <form id="perform_with">
         <p>With connected peer <select id="connected_peers"></select>, show message <input type="text" name="message" /><input type="submit" value="Go" />.</p>
+        <p>In the console, try using "rpc.with(...)" for some other provided functions:</p>
+        <pre>
+rpc.with(&lt;id&gt;).perform_calculation(5,6).then(function(r){ console.log("Returned: " + r); });
+rpc.with(&lt;id&gt;).return_object().then(function(r){ console.log(r); });
+</pre>
     </form>
     <script type="text/javascript">
         $(function () {
+            function guid() {
+                var s4 = function () {
+                    return Math.floor((1 + Math.random()) * 0x10000)
+                        .toString(16)
+                        .substring(1);
+                }
+                return s4() + s4() + s4() + s4() + s4() + s4() + s4() + s4();
+            }
+
             // My RPC methods:
             var show_message = function (str) {
                 alert(str);
@@ -35,9 +49,9 @@
             var rpc = new RPC(my_guid, 'elszxxookm1v2t9');
             window.rpc = rpc;
 
-            rpc.register("show_message", show_message);
-            rpc.register("perform_calculation", perform_calculation);
-            rpc.register("return_object", return_object);
+            rpc.provide("show_message", show_message);
+            rpc.provide("perform_calculation", perform_calculation);
+            rpc.provide("return_object", return_object);
 
             rpc.onDiscover = function (other_id) {
                 $("<option>" + other_id + "</option>").attr("guid", other_id).appendTo($("#connected_peers"));
@@ -48,7 +62,6 @@
 
             $("#my_guid").text(my_guid);
             $("#connect input[type=submit]").click(function (event) {
-                event.stopPropagation();
                 event.preventDefault();
                 rpc.connect($("input[name=other_id]").val());
             });

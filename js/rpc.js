@@ -1,194 +1,178 @@
-var guid = function () {
+var RPC = (function () {
 
-    var s4 = function () {
-        return Math.floor((1 + Math.random()) * 0x10000)
-            .toString(16)
-            .substring(1);
-    }
+    function RPC(guid, key) {
 
-    return s4() + s4() + s4() + s4() + s4() + s4() + s4() + s4();
-}
+        var self = this;
 
-var RPC = function (_guid, _key) {
+        /** private variables */
+        var procedures = {};            // procs provided by me; [func: string]=>{f: function, t: any?}
+        var available = {};             // procs provided to me; [peer: string]=>{
+                                        //                          [callName:string]=>{
+                                        //                              [callId:number]=> {cb: function?, rs: any?}
+                                        //                          }
+                                        //                      }
+        var invCounter = 0;
+        var conns = {};                 // peerID -> PeerJS.Peer
+        var me = new Peer(guid, { key: key });
 
-    var RpcReturn = function (rpc, uid, callTime) {
-
-        this.callTime = callTime;
-        this.rpc = rpc;
-        this.uid = uid;
-
-        /// takes function(result){}
-        this.onSuccess = function (func) {
-            if (rpc.pending[uid] === undefined) {
-                if (new Date() - callTime <= 500) {
-                    var _this = this;
-                    window.setTimeout(function () { _this.onSuccess(func); }, 100);
-                }
-            } else {
-                func(rpc.pending[uid]);
-            }
-            return this;
-        };
-
-        /// takes function(){}
-        this.onFailure = function (func) {
-            if (rpc.pending[uid] === undefined) {
-                if (new Date() - this.callTime > 500) {
-                    func();
-                } else {
-                    var _this = this;
-                    window.setTimeout(function () { _this.onFailure(func); }, 100);
-                }
-            }
-            return this;
-        };
-    };
-
-    var __rpc = this;
-    this.status = true;
-
-    this.receive = new Object();
-    this._functions = new Object();
-    this.call = new Object();
-    this.peers = new Object();
-    this.pending = new Object(); // pending calls which have not returned.
-
-    var my_guid = my_guid = _guid;
-    var my_key = _key;
-
-    this.me = new Peer(my_guid, { key: my_key });
-
-    this.me.on('error', function (e) {
-        if (!e || (e.message && e.message.substr(0,17) === 'Could not connect')) return;
-        console.log({error: arguments});
-    });
-
-    /**
-     * @param name - string: the name of the function; allows us to call the function as rpc.name()
-     * @param func - function: the RPC function
-     * @param _this - OPTIONAL Object: the object to be 'this'
-     */
-    this.register = function (name, func, _this) {
-        __rpc.call[name] = function () {
-            var callUid = guid();
-            peerId = arguments[0];
-            args = [].splice.call(arguments, 0);
-            args.splice(0, 1);
-
-            __rpc.pending[callUid] = undefined;
-
-            if (__rpc.peers[peerId]) {
-
-                __rpc.peers[peerId].send({
-                    "type": "rpc-call",
-                    "call": name,
-                    "args": args,
-                    "from": __rpc.me.id,
-                    "uid": callUid
-                });
-            }
-
-            return new RpcReturn(__rpc, callUid, new Date());
-        };
-        __rpc[name] = __rpc.call[name]; // rpc.funcA is a shorthand for rpc.call.funcA;
-        __rpc._functions[name] = func;
-        __rpc.receive[name] = function (from, uid, args) {
-
-            var __this = null;
-            if (__this !== undefined) { __this = this; }
-            var retval = __rpc._functions[name].apply(__this, args);
-            var conn = __rpc.peers[from];
-
+        /** private functions */
+        var _provideOnce = function (name, conn) {
             conn.send({
-                "type": "rpc-response",
-                "call": name,
-                "reply": retval,
-                "uid": uid
+                type: "provide-procedure",
+                name: name,
+                from: me.id
             });
         };
+        var _provideAll = function (conn) {
+            for (var name in procedures) {
+                _provideOnce(name, conn);
+            }
+        };
+        var _onConnection = function (conn) {
 
-        return __rpc[name]; // rpc.register() returns the function so we can save it in objects
-    };
-    this.with = function (peerId) {
-        var ret = new Object();
-        for (key in __rpc.call) {
-
-            (function (R, K) {
-                R[K] = function () {
-                    var args = [peerId];
-                    for (arg in arguments) { args.push(arguments[arg]); }
-                    return __rpc.call[K].apply(__rpc, args);
-                };
-
-            })(ret, key);
-        }
-        return ret;
-    };
-    this.connect = function (peerId) {
-        if (!this.status || peerId === undefined) return false;
-        var conn = __rpc.me.connect(peerId);
-        if (conn) {
-            conn.on('open', function () {
-                __rpc.peers[peerId] = conn;
-            });
-        } else {
-            delete __rpc.peers[peerId];
-            return false;
-        }
-        return true;
-    };
-    this.disconnect = function (peerId) {
-        if (__rpc.peers[peerId] !== undefined && __rpc.peers[peerId] !== null) {
-            __rpc.peers[peerId].close();
-            delete __rpc.peers[peerId];
-        }
-    }
-
-    // these two methods are for testing only
-    this.offline = function () {
-        this.status = false;
-        __rpc.me.destroy();
-        __rpc.peers = new Object();
-    };
-    this.online = function () {
-        this.status = true;
-        __rpc.me = new Peer(my_guid, { key: my_key });
-        onNewRPC();
-    };
-
-    // on new RPC
-    var onNewRPC = function () {
-        __rpc.me.on('connection', function (conn) {
-            if (__rpc.peers[conn.peer] === undefined) {
-                __rpc.peers[conn.peer] = __rpc.me.connect(conn.peer);
-
-                __rpc.peers[conn.peer].on('open', function () {
-                    if (__rpc.onDiscover) {
-                        __rpc.onDiscover(conn.peer);
-
-                    }
-                });
+            if (conn.peer in conns) {
+                console.error("Saw connection event for peer " + conn.peer + " twice. Ignoring.");
+                return;
             }
 
             conn.on('close', function () {
-                delete __rpc.peers[conn.peer];
-                if (__rpc.onDisconnect) {
-                    __rpc.onDisconnect(conn.peer);
-                }
+                self.onDisconnect && self.onDisconnect(conn.peer);
+                delete conns[conn.peer];
+                delete available[conn.peer];
             });
 
+            conn.on('error', function (e) {
+                console.error(e);
+            });
+
+            conn.on('open', function () {
+                _provideAll(conn);
+                conns[conn.peer] = conn;
+            });
             conn.on('data', function (data) {
+
                 if (data.type === "rpc-call") {
-                    var passedArgs = [];
-                    for (key in data.args) { passedArgs.push(data.args[key]); }
-                    __rpc.receive[data["call"]](data.from, data.uid, passedArgs);
+                    // data = { args: any[], callId: number, from: string, call: string }
+                    var args = data.args.slice();
+
+                    var procInfo = procedures[data.call];
+
+                    var _func = procInfo.f;
+                    var _this = procInfo.t;
+
+                    var result = _func.apply(_this, args);
+
+                    conn.send({
+                        type: "rpc-response",
+                        call: data.call,
+                        from: me.id,
+                        callId: data.callId,
+                        response: result
+                    });
+
                 } else if (data.type === "rpc-response") {
-                    __rpc.pending[data.uid] = data.reply;
+                    // data = { call: string, callId: number, from: string, response: any }
+                    var response = data.response;
+
+                    var callEntry = available[data.from][data.call];
+                    var callback = callEntry[data.callId];
+
+                    if (callback) {
+                        callback(response);
+                        delete callEntry[data.callId];
+                    }
+
+                } else if (data.type === "provide-procedure") {
+                    // data = { name: string, from: string }
+                    if (!(data.from in available)) available[data.from] = {};
+                    if (data.name in available[data.from]) console.error("Peer " + conn.peer + " attempting to provide " + data.name + " twice.");
+                    available[data.from][data.name] = {};
                 }
+
             });
+            self.onDiscover && self.onDiscover(conn.peer);
+        };
+        var _sendCall = function (conn, name, args) {
+            var invc = ++invCounter;
+            conn.send({
+                type: "rpc-call",
+                args: args,
+                call: name,
+                from: me.id,
+                callId: invc
+            });
+            return invc;
+        };
+        var _setCallback = function (conn, name, invc, cb) {
+            available[conn.peer][name][invc] = cb;
+            // don't worry about ordering issues between set callback and send call;
+            // javascript is single threaded. this is only a problem if someone sets
+            // a callback in an async callback; we don't want to support this on the
+            // expense of a simpler common case. Thus, always assume .r
+        };
 
+        /**
+         * @param name - string: the name of the function; allows us to call the function as rpc.name()
+         * @param func - function: the RPC function
+         * @param _this - OPTIONAL Object: the object to be 'this'
+         */
+        this.provide = function (name, func, _this) {
+            var peerId;
+
+            if (name in procedures) console.error("Overriding provided function call '" + name + "'");
+            procedures[name] = { f: func, t: _this };
+
+            for (peerId in conns) {
+                if (!conns.hasOwnProperty(peerId)) continue;
+                _provideOnce(name, conns[peerId]);
+            }
+        };
+
+        this.with = function (peerId) {
+            var ret = {};
+            var conn = conns[peerId];
+
+            for (key in available[peerId]) {
+                if (!available[peerId].hasOwnProperty(key)) continue;
+
+                ret[key] = (function (name) {
+                    return function () {
+                        var invc = _sendCall(conn, name, Array.prototype.slice.call(arguments));
+                        var _onSuccess = function (f) {
+                            _setCallback(conn, name, invc, f);
+                        };
+                        return {
+                            then: _onSuccess,
+                            onSuccess: _onSuccess
+                        };
+                    };
+                })(key);
+
+            }
+            return ret;
+        };
+        this.connect = function (peerId) {
+            var conn = me.connect(peerId);
+            _onConnection(conn);
+        };
+        this.disconnect = function (peerId) {
+            if ((peerId in conns) && conns[peerId]) {
+                conns[peerId].close();
+                delete conns[peerId];
+                delete available[peerId];
+            }
+        }
+
+        // Initialization
+        me.on('error', function (e) {
+            if (e && e.message && e.message.substr(0, 17) === 'Could not connect') return;
+            console.error(e.message);
         });
-    };
 
-    onNewRPC();
-};
+        me.on('connection', _onConnection);
+
+
+
+    };
+    return RPC;
+})();
